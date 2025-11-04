@@ -30,7 +30,9 @@ export async function editImageWithGemini(
     // Find the image part in the response
     for (const part of response.candidates?.[0]?.content?.parts || []) {
       if (part.inlineData) {
-        return part.inlineData.data;
+        const { mimeType, data } = part.inlineData;
+        // Construct the full data URL to be used directly in an <img> src
+        return `data:${mimeType};base64,${data}`;
       }
     }
     

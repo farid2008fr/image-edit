@@ -2,7 +2,7 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { editImageWithGemini } from './services/geminiService';
 import { fileToGenerativePart } from './utils/fileUtils';
-import { UploadIcon, SparklesIcon, AlertTriangleIcon } from './components/icons';
+import { UploadIcon, SparklesIcon, AlertTriangleIcon, DownloadIcon } from './components/icons';
 
 const App: React.FC = () => {
   const [originalImage, setOriginalImage] = useState<File | null>(null);
@@ -39,11 +39,10 @@ const App: React.FC = () => {
 
     try {
       const imagePart = await fileToGenerativePart(originalImage);
-      const resultBase64 = await editImageWithGemini(imagePart, prompt);
+      const editedImageUrl = await editImageWithGemini(imagePart, prompt);
       
-      if (resultBase64) {
-        const mimeType = resultBase64.match(/data:([^;]+);/)?.[1] || 'image/png';
-        setEditedImage(`data:${mimeType};base64,${resultBase64}`);
+      if (editedImageUrl) {
+        setEditedImage(editedImageUrl);
       } else {
         throw new Error('The API did not return an image. Please try a different prompt.');
       }
@@ -54,6 +53,18 @@ const App: React.FC = () => {
       setIsLoading(false);
     }
   }, [originalImage, prompt]);
+  
+  const handleDownload = () => {
+    if (!editedImage) return;
+    const link = document.createElement('a');
+    link.href = editedImage;
+    const mimeType = editedImage.match(/data:([^;]+);/)?.[1] || 'image/png';
+    const extension = mimeType.split('/')[1] === 'jpeg' ? 'jpg' : mimeType.split('/')[1] || 'png';
+    link.download = `edited-image.${extension}`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const ImageDisplay: React.FC<{ src: string; alt: string; title: string }> = ({ src, alt, title }) => (
     <div className="w-full">
@@ -127,7 +138,7 @@ const App: React.FC = () => {
 
         {/* Display Column */}
         <div className="w-full lg:w-2/3 p-6 bg-gray-800/50 rounded-xl border border-gray-700">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
             {originalImageUrl ? (
               <ImageDisplay src={originalImageUrl} alt="Original image" title="Original" />
             ) : (
@@ -136,29 +147,42 @@ const App: React.FC = () => {
                 </div>
             )}
 
-            <div className="aspect-square w-full bg-gray-800 rounded-lg flex items-center justify-center border-2 border-dashed border-gray-600 relative">
-              {isLoading && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/50 rounded-lg">
-                  <div className="w-12 h-12 border-4 border-t-transparent border-blue-400 rounded-full animate-spin"></div>
-                  <p className="mt-4 text-lg font-semibold">Editing your image...</p>
-                </div>
-              )}
-              {error && (
-                <div className="p-4 text-center text-red-300">
-                    <AlertTriangleIcon className="w-12 h-12 mx-auto text-brand-danger mb-2" />
-                    <p className="font-semibold">Oops! Something went wrong.</p>
-                    <p className="text-sm">{error}</p>
-                </div>
-              )}
+            <div className="w-full flex flex-col gap-4">
+              <div className="aspect-square w-full bg-gray-800 rounded-lg flex items-center justify-center border-2 border-dashed border-gray-600 relative">
+                {isLoading && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/50 rounded-lg">
+                    <div className="w-12 h-12 border-4 border-t-transparent border-blue-400 rounded-full animate-spin"></div>
+                    <p className="mt-4 text-lg font-semibold">Editing your image...</p>
+                  </div>
+                )}
+                {error && (
+                  <div className="p-4 text-center text-red-300">
+                      <AlertTriangleIcon className="w-12 h-12 mx-auto text-brand-danger mb-2" />
+                      <p className="font-semibold">Oops! Something went wrong.</p>
+                      <p className="text-sm">{error}</p>
+                  </div>
+                )}
+                {editedImage && !isLoading && !error && (
+                  <ImageDisplay src={editedImage} alt="Edited image" title="Edited" />
+                )}
+                {!editedImage && !isLoading && !error && (
+                  <div className="text-center text-gray-500 p-4">
+                      <SparklesIcon className="w-12 h-12 mx-auto mb-2" />
+                      <p>Your edited image will appear here.</p>
+                  </div>
+                )}
+              </div>
+              
               {editedImage && !isLoading && !error && (
-                <ImageDisplay src={editedImage} alt="Edited image" title="Edited" />
+                <button
+                  onClick={handleDownload}
+                  className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-brand-secondary text-white font-bold rounded-lg hover:bg-green-600 transition-all duration-300 transform hover:scale-105 shadow-lg"
+                  aria-label="Download edited image"
+                >
+                  <DownloadIcon className="w-5 h-5" />
+                  Download Image
+                </button>
               )}
-               {!editedImage && !isLoading && !error && (
-                <div className="text-center text-gray-500 p-4">
-                    <SparklesIcon className="w-12 h-12 mx-auto mb-2" />
-                    <p>Your edited image will appear here.</p>
-                </div>
-               )}
             </div>
           </div>
         </div>
