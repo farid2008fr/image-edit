@@ -3,7 +3,7 @@ import ReactCrop, { type Crop, type PixelCrop, centerCrop, makeAspectCrop } from
 import { editImageWithGemini } from './services/geminiService';
 import { fileToGenerativePart, dataUrlToGenerativePart } from './utils/fileUtils';
 import { resizeImage, applyCanvasFilter } from './utils/imageUtils';
-import { UploadIcon, SparklesIcon, AlertTriangleIcon, DownloadIcon, LockClosedIcon, LockOpenIcon, CropIcon, WandIcon } from './components/icons';
+import { UploadIcon, SparklesIcon, AlertTriangleIcon, DownloadIcon, LockClosedIcon, LockOpenIcon, CropIcon, WandIcon, BgRemoveIcon } from './components/icons';
 
 const App: React.FC = () => {
   const [originalImage, setOriginalImage] = useState<File | null>(null);
@@ -12,6 +12,7 @@ const App: React.FC = () => {
   const [finalImage, setFinalImage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isEnhancing, setIsEnhancing] = useState<boolean>(false);
+  const [isRemovingBg, setIsRemovingBg] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
   // Cropping state
@@ -33,6 +34,9 @@ const App: React.FC = () => {
 
   // Adjustments state
   const [contrast, setContrast] = useState(100);
+
+  // Download format state
+  const [outputFormat, setOutputFormat] = useState<'png' | 'jpeg'>('png');
 
   const originalImageUrlForCropper = useMemo(() => {
     if (originalImage) return URL.createObjectURL(originalImage);
@@ -206,13 +210,83 @@ const App: React.FC = () => {
     }
   }, [originalImage, croppedImageUrl, isResizingNeeded, originalDimensions, resizeOptions, completedCrop]);
   
-  const handleDownload = () => {
+  const handleRemoveBackgroundClick = useCallback(async () => {
+    if (!originalImage && !croppedImageUrl) {
+      setError('Please upload an image first.');
+      return;
+    }
+
+    setIsRemovingBg(true);
+    setError(null);
+    setEditedImage(null);
+
+    try {
+      let imagePart;
+      if (croppedImageUrl) {
+        imagePart = dataUrlToGenerativePart(croppedImageUrl);
+      } else if (originalImage) {
+        imagePart = await fileToGenerativePart(originalImage);
+      } else {
+        throw new Error("No image available to process.");
+      }
+
+      const REMOVE_BG_PROMPT = 'Remove the background of this image, keeping only the main subject. The background should be transparent.';
+      const editedImageUrl = await editImageWithGemini(imagePart, REMOVE_BG_PROMPT);
+      
+      if (editedImageUrl) {
+        await processAndSetImage(editedImageUrl);
+      } else {
+        throw new Error('The API did not return an image. Please try again.');
+      }
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || 'An unexpected error occurred.');
+    } finally {
+      setIsRemovingBg(false);
+    }
+  }, [originalImage, croppedImageUrl, isResizingNeeded, originalDimensions, resizeOptions, completedCrop]);
+
+  const handleDownload = async () => {
     if (!finalImage) return;
+
     const link = document.createElement('a');
-    link.href = finalImage;
-    const mimeType = finalImage.match(/data:([^;]+);/)?.[1] || 'image/png';
-    const extension = mimeType.split('/')[1] === 'jpeg' ? 'jpg' : mimeType.split('/')[1] || 'png';
+    const extension = outputFormat === 'jpeg' ? 'jpg' : 'png';
     link.download = `edited-image.${extension}`;
+
+    const currentMimeType = finalImage.match(/data:([^;]+);/)?.[1] || 'image/png';
+
+    if (currentMimeType === `image/${outputFormat}`) {
+        link.href = finalImage;
+    } else {
+        try {
+            const convertedUrl = await new Promise<string>((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    const ctx = canvas.getContext('2d');
+                    if (!ctx) {
+                        return reject(new Error('Could not get canvas context'));
+                    }
+                    if (outputFormat === 'jpeg' && currentMimeType === 'image/png') {
+                        ctx.fillStyle = 'white';
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    }
+                    ctx.drawImage(img, 0, 0);
+                    resolve(canvas.toDataURL(`image/${outputFormat}`, 0.9));
+                };
+                img.onerror = () => reject(new Error("Failed to load image for conversion."));
+                img.src = finalImage;
+            });
+            link.href = convertedUrl;
+        } catch (err) {
+            console.error('Failed to convert image:', err);
+            setError('Failed to convert image for download. Please try again.');
+            return;
+        }
+    }
+
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -372,7 +446,7 @@ const App: React.FC = () => {
           <div className="mt-auto pt-6 border-t border-gray-700/50 flex flex-col gap-4">
             <button 
               onClick={handleEnhanceClick} 
-              disabled={isLoading || isEnhancing || !originalImage} 
+              disabled={isLoading || isEnhancing || isRemovingBg || !originalImage} 
               className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-brand-secondary text-white font-bold rounded-lg hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed transform hover:scale-105 shadow-lg transition-colors"
               aria-label="Automatically enhance image quality"
             >
@@ -383,8 +457,20 @@ const App: React.FC = () => {
               )}
             </button>
             <button 
+              onClick={handleRemoveBackgroundClick} 
+              disabled={isLoading || isEnhancing || isRemovingBg || !originalImage} 
+              className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-purple-600 text-white font-bold rounded-lg hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed transform hover:scale-105 shadow-lg transition-colors"
+              aria-label="Remove image background"
+            >
+              {isRemovingBg ? (
+                <><div className="w-5 h-5 border-2 border-t-transparent border-white rounded-full animate-spin"></div>Removing Background...</>
+              ) : (
+                <><BgRemoveIcon className="w-6 h-6" />Remove Background</>
+              )}
+            </button>
+            <button 
               onClick={handleGenerateClick} 
-              disabled={isLoading || isEnhancing || !originalImage || !prompt.trim()} 
+              disabled={isLoading || isEnhancing || isRemovingBg || !originalImage || !prompt.trim()} 
               className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-brand-primary text-white font-bold rounded-lg hover:bg-blue-600 disabled:bg-gray-600 disabled:cursor-not-allowed transform hover:scale-105 shadow-lg transition-colors"
               aria-label="Generate edited image based on your prompt"
             >
@@ -402,13 +488,36 @@ const App: React.FC = () => {
 
             <div className="w-full flex flex-col gap-4">
               <div className="aspect-square w-full bg-gray-800 rounded-lg flex items-center justify-center border-2 border-dashed border-gray-600 relative">
-                {(isLoading || isEnhancing) && (<div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/50 rounded-lg"><div className="w-12 h-12 border-4 border-t-transparent border-blue-400 rounded-full animate-spin"></div><p className="mt-4 text-lg font-semibold">{isLoading ? 'Editing your image...' : 'Enhancing your image...'}</p></div>)}
+                {(isLoading || isEnhancing || isRemovingBg) && (<div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/50 rounded-lg"><div className="w-12 h-12 border-4 border-t-transparent border-blue-400 rounded-full animate-spin"></div><p className="mt-4 text-lg font-semibold">{isLoading ? 'Editing your image...' : isEnhancing ? 'Enhancing your image...' : 'Removing background...'}</p></div>)}
                 {error && (<div className="p-4 text-center text-red-300"><AlertTriangleIcon className="w-12 h-12 mx-auto text-brand-danger mb-2" /><p className="font-semibold">Oops! Something went wrong.</p><p className="text-sm">{error}</p></div>)}
-                {finalImage && !isLoading && !isEnhancing && !error && (<ImageDisplay src={finalImage} alt="Edited image" title="Edited" />)}
-                {!finalImage && !isLoading && !isEnhancing && !error && (<div className="text-center text-gray-500 p-4"><SparklesIcon className="w-12 h-12 mx-auto mb-2" /><p>Your edited image will appear here.</p></div>)}
+                {finalImage && !isLoading && !isEnhancing && !isRemovingBg && !error && (<ImageDisplay src={finalImage} alt="Edited image" title="Edited" />)}
+                {!finalImage && !isLoading && !isEnhancing && !isRemovingBg && !error && (<div className="text-center text-gray-500 p-4"><SparklesIcon className="w-12 h-12 mx-auto mb-2" /><p>Your edited image will appear here.</p></div>)}
               </div>
               
-              {finalImage && !isLoading && !isEnhancing && !error && (<button onClick={handleDownload} className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-brand-secondary text-white font-bold rounded-lg hover:bg-green-600 transform hover:scale-105 shadow-lg"><DownloadIcon className="w-5 h-5" />Download Image</button>)}
+              {finalImage && !isLoading && !isEnhancing && !isRemovingBg && !error && (
+                <div className="flex items-center gap-4">
+                  <button onClick={handleDownload} className="flex-grow w-full flex items-center justify-center gap-2 py-3 px-4 bg-brand-secondary text-white font-bold rounded-lg hover:bg-green-600 transform hover:scale-105 shadow-lg">
+                      <DownloadIcon className="w-5 h-5" />
+                      Download Image
+                  </button>
+                  <div className="flex-shrink-0 flex items-center rounded-md bg-gray-700 p-1">
+                      <button 
+                          onClick={() => setOutputFormat('png')} 
+                          className={`px-3 py-1 text-sm font-semibold rounded transition-colors ${outputFormat === 'png' ? 'bg-blue-600 text-white shadow' : 'text-gray-400 hover:bg-gray-600'}`}
+                          aria-pressed={outputFormat === 'png'}
+                      >
+                          PNG
+                      </button>
+                      <button 
+                          onClick={() => setOutputFormat('jpeg')} 
+                          className={`px-3 py-1 text-sm font-semibold rounded transition-colors ${outputFormat === 'jpeg' ? 'bg-blue-600 text-white shadow' : 'text-gray-400 hover:bg-gray-600'}`}
+                          aria-pressed={outputFormat === 'jpeg'}
+                      >
+                          JPEG
+                      </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -51,3 +51,10 @@ export const WandIcon: React.FC<{ className?: string }> = ({ className }) => (
       <path strokeLinecap="round" strokeLinejoin="round" d="M15.042 21.672 13.684 16.6m0 0-2.51 2.225.569-9.47 5.227 7.917-3.286-.672ZM21 12h-1.382m-2.023-4.22.487-.51.587-.587a.75.75 0 0 1 1.06 1.06l-.587.587-.51.487m-2.023 2.023-.487.51-.587.587a.75.75 0 0 1-1.06-1.06l.587-.587.51-.487m.587-1.053-.487-.51L17.5 8.513l.587-.587a.75.75 0 0 1 1.061 1.06l-.587.587-.51.487Zm-4.938-4.22.487.51.587.587a.75.75 0 0 1-1.06 1.06l-.587-.587-.51-.487m2.023-2.023.487.51.587.587a.75.75 0 0 1-1.06-1.06l-.587-.587-.51-.487M9 11.25l-2.25-2.25L4.5 11.25l2.25 2.25L9 11.25Z" />
     </svg>
 );
+
+export const BgRemoveIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeDasharray="2 2" d="M20.25 12a8.25 8.25 0 1 1-16.5 0 8.25 8.25 0 0 1 16.5 0Z" />
+    </svg>
+);
