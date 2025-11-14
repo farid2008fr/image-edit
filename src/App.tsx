@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop';
 import { editImageWithGemini } from './services/geminiService';
@@ -80,7 +79,7 @@ const App: React.FC = () => {
     let isMounted = true;
     const applyAdjustments = async () => {
       try {
-        let adjustedImage = editedImage;
+        let adjustedImage: string | null = editedImage;
         if (contrast !== 100) {
           adjustedImage = await applyCanvasFilter(adjustedImage, `contrast(${contrast}%)`);
         }
@@ -361,7 +360,6 @@ const App: React.FC = () => {
     const newWidth = e.target.valueAsNumber || 0;
     const sourceDims = completedCrop ?? originalDimensions;
     setResizeOptions(prev => {
-      // FIX: Add guard for division by zero
       if (prev.isAspectRatioLocked && sourceDims && sourceDims.width > 0) {
         const aspectRatio = sourceDims.height / sourceDims.width;
         return { ...prev, width: newWidth, height: Math.round(newWidth * aspectRatio) };
@@ -373,7 +371,6 @@ const App: React.FC = () => {
     const newHeight = e.target.valueAsNumber || 0;
     const sourceDims = completedCrop ?? originalDimensions;
     setResizeOptions(prev => {
-      // FIX: Add guard for division by zero
       if (prev.isAspectRatioLocked && sourceDims && sourceDims.height > 0) {
         const aspectRatio = sourceDims.width / sourceDims.height;
         return { ...prev, height: newHeight, width: Math.round(newHeight * aspectRatio) };
@@ -465,18 +462,15 @@ const App: React.FC = () => {
             </div>
             {resizeOptions.mode === 'percentage' ? (
                  <div className="flex items-center gap-3">
-                    {/* FIX: Cast number to string for input value */}
                     <input type="range" min="1" max="200" value={String(resizeOptions.percentage)} onChange={handlePercentageChange} className="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer" />
                     <span className="text-sm font-mono bg-gray-700 py-1 px-2 rounded">{resizeOptions.percentage}%</span>
                  </div>
             ) : (
                 <div className="flex items-center gap-2">
-                    {/* FIX: Cast number to string for input value */}
                     <input type="number" value={String(resizeOptions.width)} onChange={handleWidthChange} className="w-full p-2 bg-gray-700 border-2 border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 transition" aria-label="Width" />
                     <button onClick={toggleAspectRatioLock} className="p-2 rounded-md hover:bg-gray-700 transition" aria-label="Toggle lock">
                       {resizeOptions.isAspectRatioLocked ? <LockClosedIcon className="w-5 h-5 text-blue-400" /> : <LockOpenIcon className="w-5 h-5 text-gray-400" />}
                     </button>
-                    {/* FIX: Cast number to string for input value */}
                     <input type="number" value={String(resizeOptions.height)} onChange={handleHeightChange} className="w-full p-2 bg-gray-700 border-2 border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 transition" aria-label="Height" />
                 </div>
             )}
@@ -486,7 +480,6 @@ const App: React.FC = () => {
             <legend className="text-xl font-semibold text-gray-200 mb-2 block">5. Adjustments (Optional)</legend>
             <label htmlFor="contrast" className="block text-sm font-medium text-gray-400 mb-1">Contrast</label>
             <div className="flex items-center gap-3">
-                {/* FIX: Cast number to string for input value */}
                 <input id="contrast" type="range" min="50" max="200" value={String(contrast)} onChange={e => setContrast(e.target.valueAsNumber)} className="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer" />
                 <span className="text-sm font-mono bg-gray-700 py-1 px-2 rounded">{contrast}%</span>
             </div>
